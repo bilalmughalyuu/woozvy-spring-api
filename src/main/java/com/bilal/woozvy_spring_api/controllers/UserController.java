@@ -1,8 +1,10 @@
 package com.bilal.woozvy_spring_api.controllers;
 
 import com.bilal.woozvy_spring_api.dtos.UserDto;
+import com.bilal.woozvy_spring_api.dtos.UserResponseDto;
 import com.bilal.woozvy_spring_api.entities.User;
 import com.bilal.woozvy_spring_api.repositories.UserRepository;
+import com.bilal.woozvy_spring_api.services.JwtService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final JwtService jwtService;
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(
@@ -41,11 +44,10 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(
-            @RequestBody UserDto signinUserDto) {
+    public ResponseEntity<?> login(@RequestBody UserDto signinUserDto) {
+
         String email = signinUserDto.getEmail();
         String password = signinUserDto.getPassword();
-
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -59,6 +61,21 @@ public class UserController {
             );
         }
 
-        return ResponseEntity.ok(user);
+        String accessToken = jwtService.generateAccessToken(
+                user.getId(),
+                user.getEmail()
+        );
+
+        UserResponseDto response = new UserResponseDto(
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getEmail(),
+                accessToken
+        );
+
+        System.out.println(response);
+
+        return ResponseEntity.ok(response);
     }
 }
