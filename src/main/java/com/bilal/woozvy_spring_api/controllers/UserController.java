@@ -5,13 +5,12 @@ import com.bilal.woozvy_spring_api.dtos.UserResponseDto;
 import com.bilal.woozvy_spring_api.entities.User;
 import com.bilal.woozvy_spring_api.repositories.UserRepository;
 import com.bilal.woozvy_spring_api.services.JwtService;
+import com.bilal.woozvy_spring_api.services.UserService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
@@ -22,6 +21,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final UserService userService;
     private final JwtService jwtService;
 
     @PostMapping("/signup")
@@ -61,10 +61,7 @@ public class UserController {
             );
         }
 
-        String accessToken = jwtService.generateAccessToken(
-                user.getId(),
-                user.getEmail()
-        );
+        String accessToken = jwtService.generateAccessToken(user);
 
         UserResponseDto response = new UserResponseDto(
                 user.getId(),
@@ -77,5 +74,26 @@ public class UserController {
         System.out.println(response);
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/profile")
+    public UserResponseDto getUserProfile(
+            @AuthenticationPrincipal String userId
+    ) {
+        User user = userService.getUserById(Long.valueOf(userId));
+
+        if (user == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "User not found"
+            );
+        }
+
+        return new UserResponseDto(
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getEmail(),
+                null
+        );
     }
 }

@@ -1,40 +1,62 @@
+
 package com.bilal.woozvy_spring_api.services;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.JwsHeader;
+import com.bilal.woozvy_spring_api.config.JwtConfig;
+import com.bilal.woozvy_spring_api.entities.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.SecretKey;
+import java.util.Date;
+
+@AllArgsConstructor
 @Service
 public class JwtService {
 
-    private final JwtEncoder jwtEncoder;
+    private final JwtConfig jwtConfig;
 
-    public JwtService(JwtEncoder jwtEncoder) {
-        this.jwtEncoder = jwtEncoder;
+    public String generateAccessToken(User user) {
+        long expiration = Long.parseLong(
+                jwtConfig.getAccessTokenExpiration()
+        );
+
+        return generateToken(user, expiration);
     }
 
-    public String generateAccessToken(Long userId, String email) {
-        Instant now = Instant.now();
+    private String generateToken(User user, long tokenExpiration) {
+        long expirationMillis = tokenExpiration * 1000;
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .subject(userId.toString())
-                .claim("email", email)
-                .issuedAt(now)
-                .expiresAt(now.plus(3600, ChronoUnit.MINUTES))
-                .build();
+        return Jwts.builder()
+                .subject(user.getId().toString())
+                .claim("email", user.getEmail())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expirationMillis))
+                .signWith(jwtConfig.getSecretKey())
+                .compact();
+    }
 
-        JwsHeader header = JwsHeader
-                .with(MacAlgorithm.HS256)
-                .build();
+    public Claims parseToken(String token) {
+        try {
+            return getClaims(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            return null;
+        }
+    }
 
-        return jwtEncoder.encode(
-                JwtEncoderParameters.from(header, claims)
-        ).getTokenValue();
+    public Claims getClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(jwtConfig.getSecretKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    public boolean isTokenExpired(String token) {
+        var claims = getClaims(token);
+        Date expiration = claims.getExpiration();
+        return expiration == null || expiration.before(new Date());
     }
 }
